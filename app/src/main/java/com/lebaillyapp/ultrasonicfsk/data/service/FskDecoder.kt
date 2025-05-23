@@ -8,8 +8,6 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.lebaillyapp.ultrasonicfsk.data.service.FFT.fft
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,7 +33,7 @@ import kotlin.math.pow
  * @param bitDurationMs Durée d'un bit en millisecondes (par défaut 100 ms).
  * @param amplitudeThresholdDb Seuil en dB en dessous duquel on ignore les fréquences faibles.
  */
-class FSKDecoder(
+class FskDecoder(
     private val context: Context,
     private val f0: Double = 18500.0,
     private val f1: Double = 18700.0,
