@@ -60,6 +60,6 @@ dependencies {
 
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
     // FFT library
-    implementation("org.jtransforms:jtransforms:3.1") // Java FFT ultra léger
+  //  implementation("org.jtransforms:jtransforms:3.1") // Java FFT ultra léger
 
 }
