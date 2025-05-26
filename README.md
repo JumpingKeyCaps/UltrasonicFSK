@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="screenshots/logoClear.png" alt="Logo" width="433" height="333">
+</p>
+
+
 # UltrasonicFSK 
 
 > Proof-of-concept Android pour transmettre des données binaires entre deux téléphones via des **ultrasons**, sans Bluetooth, Wi-Fi ou appairage.
