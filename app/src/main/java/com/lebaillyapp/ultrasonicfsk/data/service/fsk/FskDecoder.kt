@@ -1,4 +1,4 @@
-package com.lebaillyapp.ultrasonicfsk.data.service
+package com.lebaillyapp.ultrasonicfsk.data.service.fsk
 
 import android.Manifest
 import android.content.Context

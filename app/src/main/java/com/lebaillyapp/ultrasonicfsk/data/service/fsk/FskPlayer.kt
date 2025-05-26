@@ -1,4 +1,4 @@
-package com.lebaillyapp.ultrasonicfsk.data.service
+package com.lebaillyapp.ultrasonicfsk.data.service.fsk
 
 import android.media.AudioFormat
 import android.media.AudioManager

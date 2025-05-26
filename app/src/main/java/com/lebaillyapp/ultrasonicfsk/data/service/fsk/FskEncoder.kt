@@ -1,4 +1,4 @@
-package com.lebaillyapp.ultrasonicfsk.data.service
+package com.lebaillyapp.ultrasonicfsk.data.service.fsk
 
 /**
  * ##  FskEncoder – Encodeur FSK (Binary Frequency-Shift Keying)

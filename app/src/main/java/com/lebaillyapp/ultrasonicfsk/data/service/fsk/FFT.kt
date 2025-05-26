@@ -1,4 +1,4 @@
-package com.lebaillyapp.ultrasonicfsk.data.service
+package com.lebaillyapp.ultrasonicfsk.data.service.fsk
 
 import kotlin.math.cos
 import kotlin.math.log2
