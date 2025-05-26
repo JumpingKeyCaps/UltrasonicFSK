@@ -113,7 +113,7 @@ Frame structure example:
 
 
 
-## Badges
+
 
 ![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue?logo=kotlin)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-orange?logo=android)
