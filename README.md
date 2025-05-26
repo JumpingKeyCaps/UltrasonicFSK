@@ -20,7 +20,10 @@ UltrasonicFSK converts a text message into **ultrasonic** signals using simple F
 - **bit duration** → 100 ms  
 
 The receiving phone uses FFT (Fast Fourier Transform) to detect dominant frequencies in real-time and reconstruct the original message.
-Performance: 2-FSK (10 bits/s), upgradable to 4-FSK, 8-FSK, ... N-FSK (within 13–20 kHz range) + possible multiplexing.
+
+### Performance
+
+2-FSK (10 bits/s) ---> upgradable to 4-FSK, 8-FSK, ... N-FSK (within 13–20 kHz range) + possible multiplexing.
 
 ---
 
