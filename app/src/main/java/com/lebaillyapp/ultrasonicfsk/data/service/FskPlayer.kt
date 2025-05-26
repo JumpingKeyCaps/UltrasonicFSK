@@ -9,83 +9,78 @@ import kotlin.math.sin
 
 /**
  * ### FskPlayer
- * Service de lecture FSK responsable de générer et de jouer des sons sinusoïdaux
- * correspondant à une séquence binaire FSK (fréquence 0 / fréquence 1).
+ * Service de lecture FSK responsable de jouer des sons sinusoïdaux
+ * correspondant à une séquence binaire FSK (freq0 / freq1),
+ * avec marqueurs de début/fin et gestion fluide du buffer AudioTrack.
  *
- * Utilise AudioTrack pour jouer des samples PCM 16-bit mono.
- *
- * @param sampleRate La fréquence d’échantillonnage audio (par défaut 44100 Hz).
+ * @param sampleRate Fréquence d’échantillonnage (44100 Hz par défaut)
+ * @param startFreq Fréquence utilisée comme marqueur de début (ex: 19000 Hz)
+ * @param stopFreq Fréquence utilisée comme marqueur de fin (ex: 19200 Hz)
+ * @param bitDurationMs Durée standard d’un bit (en ms)
  */
 class FskPlayer(
-    private val sampleRate: Int = 44100
+    private val sampleRate: Int = 44100,
+    private val startFreq: Double = 19000.0,
+    private val stopFreq: Double = 19200.0,
+    private val bitDurationMs: Long = 100L
 ) {
-    private val sampleBufferSize = AudioTrack.getMinBufferSize(
+    private val bufferSize = AudioTrack.getMinBufferSize(
         sampleRate,
         AudioFormat.CHANNEL_OUT_MONO,
         AudioFormat.ENCODING_PCM_16BIT
     )
 
-    private val audioTrack: AudioTrack = AudioTrack(
+    private val audioTrack = AudioTrack(
         AudioManager.STREAM_MUSIC,
         sampleRate,
         AudioFormat.CHANNEL_OUT_MONO,
         AudioFormat.ENCODING_PCM_16BIT,
-        sampleBufferSize,
+        bufferSize,
         AudioTrack.MODE_STREAM
     )
 
     private var playJob: Job? = null
 
     /**
-     * ### playFrequencies
-     * Joue une séquence de paires (fréquence, durée) via le haut-parleur.
-     * La lecture est bloquante (synchrone).
+     * ### PlayMessage
+     * Joue un message complet en FSK avec marqueurs début/fin.
      *
-     * @param frequencies Liste de paires (fréquence en Hz, durée en millisecondes).
+     * @param frequencies Liste des paires (fréquence, durée) représentant les bits
      */
-    fun playFrequencies(frequencies: List<Pair<Double, Long>>) {
-        audioTrack.play()
-        for ((frequency, durationMs) in frequencies) {
-            val buffer = generateTone(frequency, durationMs)
-            audioTrack.write(buffer, 0, buffer.size)
-        }
-        audioTrack.stop()
-        audioTrack.flush()
-    }
-
-    /**
-     * ### playAsync
-     * Joue la séquence FSK en tâche de fond (asynchrone via coroutine).
-     *
-     * @param frequencies Liste de paires (fréquence, durée).
-     * @param addSilenceBetweenBits Ajouter un petit silence entre les sons ?
-     * @param silenceDurationMs Durée du silence inséré (si activé).
-     */
-    fun playAsync(
-        frequencies: List<Pair<Double, Long>>,
-        addSilenceBetweenBits: Boolean = false,
-        silenceDurationMs: Long = 5
-    ) {
+    fun playMessage(frequencies: List<Pair<Double, Long>>) {
         playJob?.cancel()
         playJob = CoroutineScope(Dispatchers.IO).launch {
             audioTrack.play()
-            for ((frequency, durationMs) in frequencies) {
-                val tone = generateTone(frequency, durationMs)
-                audioTrack.write(tone, 0, tone.size)
 
-                if (addSilenceBetweenBits) {
-                    val silence = generateSilence(silenceDurationMs)
-                    audioTrack.write(silence, 0, silence.size)
-                }
+            // Marqueur de début (1 bit)
+            val startTone = generateTone(startFreq, bitDurationMs)
+            audioTrack.write(startTone, 0, startTone.size)
+
+            // Pause courte entre marqueur et données
+            val silence = generateSilence(20)
+            audioTrack.write(silence, 0, silence.size)
+
+            // Données
+            for ((freq, duration) in frequencies) {
+                val tone = generateTone(freq, duration)
+                audioTrack.write(tone, 0, tone.size)
             }
+
+            // Pause courte avant fin
+            audioTrack.write(silence, 0, silence.size)
+
+            // Marqueur de fin (1 bit)
+            val stopTone = generateTone(stopFreq, bitDurationMs)
+            audioTrack.write(stopTone, 0, stopTone.size)
+
             audioTrack.stop()
             audioTrack.flush()
         }
     }
 
     /**
-     * ### stop
-     * Coupe immédiatement l’émission sonore en cours.
+     * ### Stop
+     * Stoppe la lecture immédiatement.
      */
     fun stop() {
         playJob?.cancel()
@@ -94,15 +89,15 @@ class FskPlayer(
     }
 
     /**
-     * ### generateTone
-     * Génère un tableau PCM 16-bit correspondant à une onde sinusoïdale donnée.
+     * ### GenerateTone
+     * Génère un tableau PCM 16-bit pour une onde sinusoïdale.
      *
-     * @param freq Fréquence de l’onde (en Hz).
-     * @param durationMs Durée du son (en millisecondes).
-     * @return Tableau de samples audio.
+     * @param freq Fréquence (Hz)
+     * @param durationMs Durée en millisecondes
+     * @return Samples audio
      */
     private fun generateTone(freq: Double, durationMs: Long): ShortArray {
-        val numSamples = (sampleRate * (durationMs / 1000.0)).toInt()
+        val numSamples = (sampleRate * durationMs / 1000.0).toInt()
         val samples = ShortArray(numSamples)
         for (i in 0 until numSamples) {
             val angle = 2.0 * PI * i * freq / sampleRate
@@ -112,14 +107,14 @@ class FskPlayer(
     }
 
     /**
-     * ### generateSilence
-     * Génère un tableau de silence (échantillons à 0) pour une durée donnée.
+     * ### GenerateSilence
+     * Génère un tableau de silence (samples à zéro).
      *
-     * @param durationMs Durée du silence (en millisecondes).
-     * @return Tableau de samples audio à 0.
+     * @param durationMs Durée en ms
+     * @return Samples silence
      */
     private fun generateSilence(durationMs: Long): ShortArray {
-        val numSamples = (sampleRate * (durationMs / 1000.0)).toInt()
+        val numSamples = (sampleRate * durationMs / 1000.0).toInt()
         return ShortArray(numSamples) { 0 }
     }
 }
