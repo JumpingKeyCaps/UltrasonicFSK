@@ -15,7 +15,7 @@ UltrasonicFSK démontre la transmission d’un message texte en le modulant en *
 - **bit 1** → 18 700 Hz  
 - **durée d’un bit** → 100 ms  
 
-Le téléphone récepteur détecte les fréquences dominantes en temps réel via FFT pour reconstruire le message.
+Le téléphone récepteur détecte les fréquences dominantes en temps réel via FFT (Fast Fourier Transform) pour reconstruire le message.
 
 
 ---
@@ -25,7 +25,7 @@ Le téléphone récepteur détecte les fréquences dominantes en temps réel via
 ### Émetteur
 
 - Conversion d’un message texte en ASCII → binaire
-- Encodage FSK : chaque bit → fréquence (0 ou 1)
+- Encodage FSK (Frequency Shift Keying) : chaque bit → fréquence (0 ou 1)
 - Émission via AudioTrack : une fréquence jouée 100 ms par bit
 - Optionnel : insertion d’un préambule (ex: 10101010) pour aider à la détection de début de message
 - Optionnel : ajout d’un checksum (ex: simple XOR) pour vérification d’intégrité
@@ -33,7 +33,7 @@ Le téléphone récepteur détecte les fréquences dominantes en temps réel via
 ### Récepteur
 
 - Capture en continu via AudioRecord
-- Analyse par FFT glissante (fenêtre de 100 ms, stride ajustable)
+- Analyse par FFT (Fast Fourier Transform) glissante (fenêtre de 100 ms, stride ajustable)
 - Détection de la première fréquence dominante significative, pas nécessairement la plus forte (important en présence d’échos)
 - Filtrage des fréquences non attendues
 - Ignorer les pics secondaires (échos ou bruit)
