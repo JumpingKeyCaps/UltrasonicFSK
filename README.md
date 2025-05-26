@@ -3,102 +3,120 @@
 </p>
 
 
-# UltrasonicFSK 
+# UltrasonicFSK
 
-> Proof-of-concept Android pour transmettre des données binaires entre deux téléphones via des **ultrasons**, sans Bluetooth, Wi-Fi ou appairage.
-
----
-
-##  Présentation
-
-POC Android permettant la transmission de données binaires via ultrasons entre deux téléphones sans synchronisation ni appairage, à l’aide d’une modulation FSK binaire.
-Le projet gére les échos acoustiques naturellement présents dans l’environnement.
-
-UltrasonicFSK démontre la transmission d’un message texte en le modulant en **ultrasons** à l’aide d’une modulation FSK (Frequency Shift Keying) simple :
-
-- **bit 0** → 18 500 Hz  
-- **bit 1** → 18 700 Hz  
-- **durée d’un bit** → 100 ms  
-
-Le téléphone récepteur détecte les fréquences dominantes en temps réel via FFT (Fast Fourier Transform) pour reconstruire le message.
-Performance : 2-FSK (10bits/s)  upgradable to 4-FSK, 8-FSK, ... N-FSK (limiter entre 13khz et 20khz) + Multiplexage possible.
+> Android Proof-of-Concept to transmit binary data between two phones via **ultrasound**, without Bluetooth, Wi-Fi, or pairing.
 
 ---
 
-##  Fonctionnalités
+## Overview
 
-### Émetteur
+This Android POC demonstrates binary data transmission via ultrasound between two phones using basic binary FSK modulation, without any prior synchronization or pairing. The project handles environmental acoustic echoes.
 
-- Conversion d’un message texte en ASCII → binaire
-- Encodage FSK (Frequency Shift Keying) : chaque bit → fréquence (0 ou 1)
-- Émission via AudioTrack : une fréquence jouée 100 ms par bit
-- Optionnel : insertion d’un préambule (ex: 10101010) pour aider à la détection de début de message
-- Optionnel : ajout d’un checksum (ex: simple XOR) pour vérification d’intégrité
+UltrasonicFSK converts a text message into **ultrasonic** signals using simple Frequency Shift Keying (FSK):
 
-### Récepteur
+- **bit 0** → 18,500 Hz  
+- **bit 1** → 18,700 Hz  
+- **bit duration** → 100 ms  
 
-- Capture en continu via AudioRecord
-- Analyse par FFT (Fast Fourier Transform) glissante (fenêtre de 100 ms, stride ajustable)
-- Détection de la première fréquence dominante significative, pas nécessairement la plus forte (important en présence d’échos)
-- Filtrage des fréquences non attendues
-- Ignorer les pics secondaires (échos ou bruit)
-- Reconstruction de la trame binaire
-- Conversion de la trame en ASCII
-- Affichage en temps réel dans l’UI Jetpack Compose
-
-
-### Gestion des échos
-Les signaux ultrasonores peuvent rebondir sur les murs/plafonds, créant des copies retardées du signal :
-
-Solutions mises en place :
-
-- Fenêtre temporelle fixe : 100 ms par bit
-- Extraction du 1er pic spectral significatif, et non du plus fort
-- Gap de silence facultatif (ex : 20 ms entre chaque bit) pour laisser les échos mourir avant le bit suivant
-- Seuil minimum d’énergie pour éviter le bruit
-
-
-
-
-### Protocole de transmission simplifié
-- Préambule (ex: 10101010) – pour indiquer le début du message
-- Message encodé (en ASCII → binaire)
-- Checksum (XOR simple de tous les bits)
-- Transmission par fréquence, 100 ms/bit
-- Réception : FFT, détection du premier pic, reconstruction des bits
-- Mode longue distance en audible a 3000 hz (8m to 10m)
-- Mode Court distance en ultrason a 18500 hz (1m to 3m)
-- Performance : 2-FSK 10bits/s (upgradable to 4-FSK, 8-FSK, etc...)
-- Micro-protocole efficace pour maximiser l’information transmise malgré la faible bande passante  
-- Structure de trame compacte :  
-  - Marqueur de début (STX) / Type de message / Payload compressé / Marqueur de fin (ETX)  
-  - Utilisation possible d’un dictionnaire pour encoder des mots ou commandes fréquents par index  
-  - Réduction drastique du volume de données à transmettre pour optimiser la latence et la fiabilité  
-- Le protocole simple à décoder et tolérant aux erreurs dues au bruit ou interférences  
-
+The receiving phone uses FFT (Fast Fourier Transform) to detect dominant frequencies in real-time and reconstruct the original message.
+Performance: 2-FSK (10 bits/s), upgradable to 4-FSK, 8-FSK, ... N-FSK (within 13–20 kHz range) + possible multiplexing.
 
 ---
 
-## Stack technique
+## Features
 
-- Audio Output ->	AudioTrack (PCM 44.1kHz)
-- Audio Input ->	AudioRecord
-- FFT ->	implémentation maison
-- UI ->	Jetpack Compose
-- Archi ->	MVVM (ViewModel + State)
+### Transmitter
+
+- Converts ASCII text to binary
+- FSK encoding: each bit → frequency (0 or 1)
+- Playback using AudioTrack: each frequency is played for 100 ms per bit
+- Optional: preamble insertion (e.g., 10101010) to aid message start detection
+- Optional: checksum (e.g., XOR) for integrity verification
+
+### Receiver
+
+- Continuous capture with AudioRecord
+- Sliding FFT analysis (100 ms window, adjustable stride)
+- Detects the first significant dominant frequency (not necessarily the strongest – crucial with echoes)
+- Filters unexpected frequencies
+- Ignores secondary peaks (echoes/noise)
+- Rebuilds binary frame
+- Converts binary to ASCII text
+- Displays the message in real-time using Jetpack Compose UI
+
+### Echo Handling
+
+Ultrasounds can reflect off walls/ceilings, producing delayed signal copies.
+
+Implemented solutions:
+
+- Fixed window: 100 ms per bit
+- Extract first significant spectral peak, not the strongest
+- Optional silence gap (e.g., 20 ms between bits) to let echoes decay
+- Minimum energy threshold to filter noise
+
+### Simplified Transmission Protocol
+
+- Preamble (e.g., 10101010) – marks start of message
+- Message encoded (ASCII → binary)
+- Checksum (simple XOR)
+- Frequency transmission, 100 ms per bit
+- Reception via FFT → frequency → bit → text
+- Long-range audible mode at 3000 Hz (8–10 meters)
+- Short-range ultrasonic mode at 18,500 Hz (1–3 meters)
+- Performance: 2-FSK 10 bits/s (upgradable to 4-FSK, 8-FSK, etc.)
+- Micro-protocol designed to maximize data efficiency within bandwidth limits
+
+Frame structure example:
+
+```
+[STX] [TYPE] [PAYLOAD] [CHECKSUM] [ETX]
+```
+
+- Start marker (STX) / Message type / Compressed payload / End marker (ETX)
+- Optionally uses a dictionary to encode frequent words or commands by index
+- Greatly reduces data size, improves latency and reliability
+- Simple, error-tolerant protocol for noisy environments
 
 ---
 
 
-###  Bonus 
 
-- Bit de start / stop pour encadrer la trame
-- Correction simple d’erreurs (redondance)
-- Affichage du spectre audio en temps réel
+## Tech Stack
+
+| Composant         | Implementation                |
+|-------------------|-------------------------------|
+| Audio Output      | `AudioTrack` (PCM 44.1 kHz)   |
+| Audio Input       | `AudioRecord`                 |
+| Traitement        | FFT custom (maison)           |
+| UI                | Jetpack Compose               |
+| Architecture      | MVVM (ViewModel + StateFlow)  |
+
 
 
 ---
 
+
+
+## Extras
+
+- Start/Stop bits for framing
+- Simple error correction (redundancy)
+- Real-time audio spectrum visualizer
+
+---
+
+
+
+
+## Badges
+
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue?logo=kotlin)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-orange?logo=android)
+![MVVM](https://img.shields.io/badge/Architecture-MVVM-green)
+![Audio](https://img.shields.io/badge/AudioTrack%2FAudioRecord-PCM%2044.1kHz-yellow)
+![Custom FFT](https://img.shields.io/badge/FFT-Custom-lightgrey)
 
 
 
