@@ -45,6 +45,7 @@ import kotlin.math.sqrt
  */
 class FskDecoder(
     private val context: Context,
+    private val parser: SimpleBinaryParser, // ⬅️ nouveau paramètre
     private val f0: Double = 18500.0,
     private val f1: Double = 18700.0,
     private val startFreq: Double = 19000.0,
@@ -66,17 +67,8 @@ class FskDecoder(
 
     private val decoderScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    private val _bitFlow = MutableSharedFlow<Int>(extraBufferCapacity = 128)
-    val bitFlow: SharedFlow<Int> get() = _bitFlow.asSharedFlow()
-
-    // Buffer circulaire pour stocker les dernières fréquences détectées pour moyennage
     private val recentFreqs = ArrayDeque<Double>(smoothingWindow)
 
-    // État de réception message
-    private var isReceivingMessage = false
-    private val receivedBitsBuffer = mutableListOf<Int>()
-
-    // Pour ajuster dynamiquement le seuil selon le bruit ambiant
     private var dynamicAmplitudeThresholdDb = baseAmplitudeThresholdDb
 
     fun startDecoding() {
@@ -112,34 +104,24 @@ class FskDecoder(
             while (isActive) {
                 val read = audioRecord?.read(audioBuffer, 0, bufferSize) ?: 0
                 if (read > 0) {
-                    // Convertir en double
                     for (i in 0 until read) {
                         doubleBuffer[i] = audioBuffer[i].toDouble()
                     }
 
-                    // Extraire fréquence dominante
                     val freqRaw = extractDominantFrequency(doubleBuffer.copyOf(read), sampleRate)
 
                     if (freqRaw > 0) {
-                        // Mise à jour buffer moyennage
                         if (recentFreqs.size == smoothingWindow) recentFreqs.removeFirst()
                         recentFreqs.add(freqRaw)
 
-                        // Moyenne simple
                         val freqAvg = recentFreqs.average()
-
-                        // Ajustement dynamique seuil amplitude (simple rolling min)
                         adjustDynamicThreshold(doubleBuffer.copyOf(read))
 
-                        // Détecter la fréquence la plus probable
-                        val detectedBitOrMarker = detectBitOrMarker(freqAvg)
-
-                        detectedBitOrMarker?.let { symbol ->
-                            handleSymbol(symbol)
+                        detectBitOrMarker(freqAvg)?.let { symbol ->
+                            parser.onBitReceived(symbol) // ⬅️ on délègue au parser
                         }
                     }
                 }
-
                 delay(bitDurationMs.toLong())
             }
         }
@@ -153,90 +135,36 @@ class FskDecoder(
         audioRecord = null
 
         recentFreqs.clear()
-        receivedBitsBuffer.clear()
-        isReceivingMessage = false
     }
 
-    /**
-     * Ajuste dynamiquement le seuil d'amplitude en fonction du niveau sonore
-     * moyen du buffer actuel, pour mieux filtrer bruit / silence.
-     */
     private fun adjustDynamicThreshold(buffer: DoubleArray) {
-        // On calcule le niveau RMS du buffer
         val rms = sqrt(buffer.map { it * it }.average())
-        // Converti en dB approximatif
         val rmsDb = 20 * log10(rms + 1e-12)
-
-        // Lissage simple vers le seuil dynamique
         dynamicAmplitudeThresholdDb = (dynamicAmplitudeThresholdDb * 0.9) + (rmsDb * 0.1)
 
-        // Ne pas descendre trop bas
         if (dynamicAmplitudeThresholdDb > baseAmplitudeThresholdDb) {
             dynamicAmplitudeThresholdDb = baseAmplitudeThresholdDb
         }
     }
 
-    /**
-     * Détecte si la fréquence correspond à un bit 0/1, ou marqueur start/stop.
-     * Renvoie un Int spécial pour start/stop (-1 / -2) ou 0/1 pour bit,
-     * ou null si fréquence hors plage utile.
-     */
     private fun detectBitOrMarker(freq: Double): Int? {
         val tolerance = 150.0
 
         return when {
-            abs(freq - startFreq) < tolerance -> -1  // Start marker
-            abs(freq - stopFreq) < tolerance -> -2   // Stop marker
-            abs(freq - f0) < tolerance -> 0          // Bit 0
-            abs(freq - f1) < tolerance -> 1          // Bit 1
+            abs(freq - startFreq) < tolerance -> 2  // Start = 2
+            abs(freq - stopFreq) < tolerance -> 3   // Stop = 3
+            abs(freq - f0) < tolerance -> 0         // Bit 0
+            abs(freq - f1) < tolerance -> 1         // Bit 1
             else -> null
         }
     }
 
-    /**
-     * Gère les symboles détectés (start, stop, bits),
-     * contrôle le buffer de réception, et émet les bits validés.
-     */
-    private suspend fun handleSymbol(symbol: Int) {
-        when (symbol) {
-            -1 -> { // Marqueur start détecté
-                isReceivingMessage = true
-                receivedBitsBuffer.clear()
-                Log.d("FskDecoder", "Début message détecté")
-            }
-
-            -2 -> { // Marqueur stop détecté
-                if (isReceivingMessage) {
-                    Log.d("FskDecoder", "Fin message détectée, bits reçus: ${receivedBitsBuffer.size}")
-                    // TODO: Ici tu peux valider/checker le message (CRC, checksum, etc)
-                    // On émet les bits du message
-                    receivedBitsBuffer.forEach {
-                        _bitFlow.emit(it)
-                    }
-                }
-                isReceivingMessage = false
-                receivedBitsBuffer.clear()
-            }
-
-            0, 1 -> {
-                if (isReceivingMessage) {
-                    receivedBitsBuffer.add(symbol)
-                }
-            }
-        }
-    }
-
-    /**
-     * Extrait la fréquence dominante d'un buffer audio via FFT.
-     * Applique une fenêtre de Hamming, puis calcule magnitude en dB.
-     */
     private fun extractDominantFrequency(data: DoubleArray, sampleRate: Int): Double {
         val n = data.size
         val size = Integer.highestOneBit(n).takeIf { it == n } ?: (Integer.highestOneBit(n) shl 1)
 
         val padded = DoubleArray(size).apply {
             for (i in data.indices) this[i] = data[i]
-            for (i in data.size until size) this[i] = 0.0
         }
 
         val windowed = applyHammingWindow(padded)
