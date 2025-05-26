@@ -8,15 +8,27 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * ### FskPlayer
- * Service de lecture FSK responsable de jouer des sons sinusoïdaux
- * correspondant à une séquence binaire FSK (freq0 / freq1),
- * avec marqueurs de début/fin et gestion fluide du buffer AudioTrack.
+ * #  FskPlayer – Générateur Audio FSK (émission)
  *
- * @param sampleRate Fréquence d’échantillonnage (44100 Hz par défaut)
- * @param startFreq Fréquence utilisée comme marqueur de début (ex: 19000 Hz)
- * @param stopFreq Fréquence utilisée comme marqueur de fin (ex: 19200 Hz)
- * @param bitDurationMs Durée standard d’un bit (en ms)
+ * Composant responsable de la **lecture audio FSK** sur une sortie mono. Ce service produit des signaux sinusoïdaux à des fréquences précises
+ * pour encoder une séquence binaire à l'aide de deux tonalités (`freq0`, `freq1`). Il gère aussi les marqueurs **start/stop** et une courte
+ * pause silencieuse pour fiabiliser la réception.
+ *
+ * ---
+ *
+ * ##  Paramètres principaux :
+ * @param sampleRate Fréquence d’échantillonnage (ex. 44100 Hz, idéal pour l'audio haute fréquence)
+ * @param startFreq Fréquence utilisée pour signaler le début d’un message (ex. 19000 Hz)
+ * @param stopFreq Fréquence utilisée pour signaler la fin d’un message (ex. 19200 Hz)
+ * @param bitDurationMs Durée en millisecondes d’un bit (ex. 100 ms pour du 10 bauds)
+ *
+ * ---
+ *
+ * ##  Fonctionnalités :
+ * - Joue une séquence de fréquences avec AudioTrack (mode STREAM)
+ * - Ajoute automatiquement les marqueurs **start** et **stop**
+ * - Génère des pauses silencieuses entre les blocs (anti-collage)
+ * - Gère l’annulation propre via CoroutineScope
  */
 class FskPlayer(
     private val sampleRate: Int = 44100,
@@ -42,45 +54,46 @@ class FskPlayer(
     private var playJob: Job? = null
 
     /**
-     * ### PlayMessage
-     * Joue un message complet en FSK avec marqueurs début/fin.
+     * ##  playMessage()
+     * Lance la lecture d’un message FSK (avec début/fin et silence).
      *
-     * @param frequencies Liste des paires (fréquence, durée) représentant les bits
+     * @param frequencies Liste des paires `(fréquence, durée)` représentant les bits (f0 / f1)
      */
     fun playMessage(frequencies: List<Pair<Double, Long>>) {
         playJob?.cancel()
         playJob = CoroutineScope(Dispatchers.IO).launch {
             audioTrack.play()
 
-            // Marqueur de début (1 bit)
+            //  Marqueur de début
             val startTone = generateTone(startFreq, bitDurationMs)
             audioTrack.write(startTone, 0, startTone.size)
 
-            // Pause courte entre marqueur et données
+            //  Petite pause (20 ms)
             val silence = generateSilence(20)
             audioTrack.write(silence, 0, silence.size)
 
-            // Données
+            //  Message binaire
             for ((freq, duration) in frequencies) {
                 val tone = generateTone(freq, duration)
                 audioTrack.write(tone, 0, tone.size)
             }
 
-            // Pause courte avant fin
+            //  Petite pause
             audioTrack.write(silence, 0, silence.size)
 
-            // Marqueur de fin (1 bit)
+            //  Marqueur de fin
             val stopTone = generateTone(stopFreq, bitDurationMs)
             audioTrack.write(stopTone, 0, stopTone.size)
 
+            //  Nettoyage
             audioTrack.stop()
             audioTrack.flush()
         }
     }
 
     /**
-     * ### Stop
-     * Stoppe la lecture immédiatement.
+     * ##  stop()
+     * Stoppe la lecture immédiatement (annule la coroutine et stoppe l'audio).
      */
     fun stop() {
         playJob?.cancel()
@@ -89,12 +102,12 @@ class FskPlayer(
     }
 
     /**
-     * ### GenerateTone
-     * Génère un tableau PCM 16-bit pour une onde sinusoïdale.
+     * ##  generateTone()
+     * Génère un tableau PCM 16-bit mono pour une onde sinusoïdale donnée.
      *
-     * @param freq Fréquence (Hz)
+     * @param freq Fréquence en Hz
      * @param durationMs Durée en millisecondes
-     * @return Samples audio
+     * @return ShortArray contenant les échantillons audio
      */
     private fun generateTone(freq: Double, durationMs: Long): ShortArray {
         val numSamples = (sampleRate * durationMs / 1000.0).toInt()
@@ -107,11 +120,11 @@ class FskPlayer(
     }
 
     /**
-     * ### GenerateSilence
-     * Génère un tableau de silence (samples à zéro).
+     * ##  generateSilence()
+     * Génère un silence (tableau de zéros PCM).
      *
-     * @param durationMs Durée en ms
-     * @return Samples silence
+     * @param durationMs Durée du silence en ms
+     * @return ShortArray de silence
      */
     private fun generateSilence(durationMs: Long): ShortArray {
         val numSamples = (sampleRate * durationMs / 1000.0).toInt()
