@@ -21,7 +21,7 @@ UltrasonicFSK démontre la transmission d’un message texte en le modulant en *
 - **durée d’un bit** → 100 ms  
 
 Le téléphone récepteur détecte les fréquences dominantes en temps réel via FFT (Fast Fourier Transform) pour reconstruire le message.
-
+Performance : 2-FSK (10bits/s)  upgradable to 4-FSK, 8-FSK, ... N-FSK (limiter entre 13khz et 20khz) + Multiplexage possible.
 
 ---
 
@@ -56,10 +56,8 @@ Solutions mises en place :
 - Extraction du 1er pic spectral significatif, et non du plus fort
 - Gap de silence facultatif (ex : 20 ms entre chaque bit) pour laisser les échos mourir avant le bit suivant
 - Seuil minimum d’énergie pour éviter le bruit
-- Performance : 2-FSK 10bits/s (upgradable to 4-FSK, 8-FSK, etc...)
-- Protocole custom adapter a la faible bande passante
-- Mode longue distance en audible a 3000 hz (8m to 10m)
-- Mode Court distance en ultrason a 18500 hz (1m to 3m)
+
+
 
 
 ### Protocole de transmission simplifié
@@ -68,18 +66,24 @@ Solutions mises en place :
 - Checksum (XOR simple de tous les bits)
 - Transmission par fréquence, 100 ms/bit
 - Réception : FFT, détection du premier pic, reconstruction des bits
-
-
+- Mode longue distance en audible a 3000 hz (8m to 10m)
+- Mode Court distance en ultrason a 18500 hz (1m to 3m)
+- Performance : 2-FSK 10bits/s (upgradable to 4-FSK, 8-FSK, etc...)
+- Micro-protocole efficace pour maximiser l’information transmise malgré la faible bande passante  
+- Structure de trame compacte :  
+  - Marqueur de début (STX) / Type de message / Payload compressé / Marqueur de fin (ETX)  
+  - Utilisation possible d’un dictionnaire pour encoder des mots ou commandes fréquents par index  
+  - Réduction drastique du volume de données à transmettre pour optimiser la latence et la fiabilité  
+- Le protocole simple à décoder et tolérant aux erreurs dues au bruit ou interférences  
 
 
 ---
 
 ## Stack technique
 
-
 - Audio Output ->	AudioTrack (PCM 44.1kHz)
 - Audio Input ->	AudioRecord
-- FFT ->	JTransforms ou implémentation maison
+- FFT ->	implémentation maison
 - UI ->	Jetpack Compose
 - Archi ->	MVVM (ViewModel + State)
 
