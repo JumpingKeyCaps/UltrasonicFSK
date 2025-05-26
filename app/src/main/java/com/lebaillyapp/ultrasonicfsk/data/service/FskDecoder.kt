@@ -13,9 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -24,28 +21,35 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+
 /**
- * ### FskDecoder amélioré
+ * ##  FskDecoder – Décodeur FSK binaire avec détection de start/stop
  *
- * Service de décodage FSK avec :
- * - Détection des marqueurs start/stop (fréquences spécifiques)
- * - Moyennage des fréquences détectées sur plusieurs fenêtres
- * - Seuil dynamique d’amplitude pour filtrer le bruit
- * - Bufferisation des bits reçus avec validation start/stop
+ * Ce service analyse un flux audio via le micro, détecte les fréquences dominantes
+ * et reconstruit une séquence binaire correspondant au message émis.
  *
- * @param context Context Android (nécessaire pour vérifier permissions)
- * @param f0 Fréquence bit 0 (Hz)
- * @param f1 Fréquence bit 1 (Hz)
- * @param startFreq Fréquence marqueur de début message (Hz)
- * @param stopFreq Fréquence marqueur de fin message (Hz)
- * @param sampleRate Fréquence d’échantillonnage (Hz)
- * @param bitDurationMs Durée d’un bit (ms)
- * @param baseAmplitudeThresholdDb Seuil de base amplitude (dB)
- * @param smoothingWindow Nombre de fenêtres FFT pour moyennage
+ * ---
+ * ###  Fonctionnalités principales :
+ * - Détection des marqueurs de début (`startFreq`) et de fin (`stopFreq`)
+ * - Moyennage sur plusieurs fenêtres pour fiabilité
+ * - Seuil d'amplitude adaptatif pour ignorer le bruit
+ * - Délégation du décodage logique au `SimpleBinaryParser`
+ *
+ * ---
+ * @param context Contexte Android (utilisé pour vérifier la permission micro)
+ * @param parser Instance de [SimpleBinaryParser] pour traiter les bits détectés
+ * @param f0 Fréquence du bit 0 (en Hz)
+ * @param f1 Fréquence du bit 1 (en Hz)
+ * @param startFreq Fréquence spéciale pour signaler le début d’un message
+ * @param stopFreq Fréquence spéciale pour signaler la fin d’un message
+ * @param sampleRate Fréquence d’échantillonnage audio
+ * @param bitDurationMs Durée d’un bit en millisecondes
+ * @param baseAmplitudeThresholdDb Seuil de base pour ignorer le bruit (en dB)
+ * @param smoothingWindow Nombre de fenêtres FFT utilisées pour la moyenne glissante
  */
 class FskDecoder(
     private val context: Context,
-    private val parser: SimpleBinaryParser, // ⬅️ nouveau paramètre
+    private val parser: SimpleBinaryParser,
     private val f0: Double = 18500.0,
     private val f1: Double = 18700.0,
     private val startFreq: Double = 19000.0,
@@ -66,11 +70,14 @@ class FskDecoder(
     private var decodingJob: Job? = null
 
     private val decoderScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
     private val recentFreqs = ArrayDeque<Double>(smoothingWindow)
-
     private var dynamicAmplitudeThresholdDb = baseAmplitudeThresholdDb
 
+    /**
+     * ##  startDecoding
+     * Lance la lecture micro et démarre le traitement audio en coroutine.
+     * Détecte les fréquences dominantes à intervalles réguliers et transmet les bits à `parser`.
+     */
     fun startDecoding() {
         if (decodingJob != null) return
 
@@ -118,7 +125,7 @@ class FskDecoder(
                         adjustDynamicThreshold(doubleBuffer.copyOf(read))
 
                         detectBitOrMarker(freqAvg)?.let { symbol ->
-                            parser.onBitReceived(symbol) // ⬅️ on délègue au parser
+                            parser.onBitReceived(symbol)
                         }
                     }
                 }
@@ -127,16 +134,23 @@ class FskDecoder(
         }
     }
 
+    /**
+     * ##  stopDecoding
+     * Stoppe proprement l’enregistrement audio et la coroutine de décodage.
+     */
     fun stopDecoding() {
         decodingJob?.cancel()
         decodingJob = null
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
-
         recentFreqs.clear()
     }
 
+    /**
+     * ##  adjustDynamicThreshold
+     * Ajuste dynamiquement le seuil de détection à partir du niveau RMS du buffer courant.
+     */
     private fun adjustDynamicThreshold(buffer: DoubleArray) {
         val rms = sqrt(buffer.map { it * it }.average())
         val rmsDb = 20 * log10(rms + 1e-12)
@@ -147,18 +161,30 @@ class FskDecoder(
         }
     }
 
+    /**
+     * ##  detectBitOrMarker
+     * Détecte si la fréquence moyenne correspond à un bit (`0` ou `1`) ou à un marqueur (`start`, `stop`).
+     *
+     * @return Code symbolique : `0` pour 0, `1` pour 1, `2` pour start, `3` pour stop, `null` sinon.
+     */
     private fun detectBitOrMarker(freq: Double): Int? {
         val tolerance = 150.0
-
         return when {
-            abs(freq - startFreq) < tolerance -> 2  // Start = 2
-            abs(freq - stopFreq) < tolerance -> 3   // Stop = 3
-            abs(freq - f0) < tolerance -> 0         // Bit 0
-            abs(freq - f1) < tolerance -> 1         // Bit 1
+            abs(freq - startFreq) < tolerance -> 2
+            abs(freq - stopFreq) < tolerance -> 3
+            abs(freq - f0) < tolerance -> 0
+            abs(freq - f1) < tolerance -> 1
             else -> null
         }
     }
 
+    /**
+     * ##  extractDominantFrequency
+     * Applique une FFT à la fenêtre audio pour trouver la fréquence dominante utile.
+     * Utilise un seuil dynamique pour ignorer les pics faibles.
+     *
+     * @return La fréquence dominante détectée (ou -1 si aucune significative).
+     */
     private fun extractDominantFrequency(data: DoubleArray, sampleRate: Int): Double {
         val n = data.size
         val size = Integer.highestOneBit(n).takeIf { it == n } ?: (Integer.highestOneBit(n) shl 1)
@@ -174,7 +200,7 @@ class FskDecoder(
         FFT.fft(real, imag)
 
         val magnitudes = DoubleArray(size / 2) { i ->
-            10 * kotlin.math.log10(real[i].pow(2) + imag[i].pow(2) + 1e-12)
+            10 * log10(real[i].pow(2) + imag[i].pow(2) + 1e-12)
         }
 
         val maxIndex = magnitudes
@@ -186,6 +212,10 @@ class FskDecoder(
         return maxIndex * sampleRate.toDouble() / size
     }
 
+    /**
+     * ##  applyHammingWindow
+     * Applique une fenêtre de Hamming pour lisser le signal avant FFT.
+     */
     private fun applyHammingWindow(input: DoubleArray): DoubleArray {
         val n = input.size
         return DoubleArray(n) { i ->
