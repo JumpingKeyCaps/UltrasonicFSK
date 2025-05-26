@@ -5,48 +5,29 @@ import kotlin.math.log2
 import kotlin.math.sin
 
 /**
- * ##  FFT – Transformée de Fourier Rapide (Cooley-Tukey)
+ * ## FFT – Transformée de Fourier Rapide (Cooley-Tukey) corrigée
  *
- * Implémentation maison de la transformée de Fourier rapide (FFT), utilisée pour extraire les composantes fréquentielles
- * d’un signal audio dans le cadre d’un décodage FSK.
+ * Implémentation maison de la FFT et IFFT.
+ * ⚠ Fonctionne uniquement sur des tailles puissances de 2.
  *
- * ⚠ Fonctionne uniquement sur des tailles de tableau puissance de 2.
- *
- * ---
- * ###  API
- * - [fft] : Applique la FFT sur deux tableaux (réel et imaginaire)
- *
- * ---
+ * API :
+ * - fft(real, imag) : FFT directe
+ * - ifft(real, imag) : FFT inverse
  */
 object FFT {
 
     /**
-     * ##  fft
-     *
-     * Applique la transformée de Fourier rapide (FFT) sur deux tableaux (réel + imaginaire).
-     * Modifie les tableaux *in-place*.
-     *
-     * ---
-     * @param real Tableau contenant la partie réelle du signal d'entrée.
-     * @param imag Tableau contenant la partie imaginaire du signal d'entrée.
-     *
-     * ---
-     * @throws IllegalArgumentException si :
-     * - les deux tableaux n'ont pas la même taille
-     * - la taille n'est pas une puissance de 2
-     *
-     * ---
-     * ###  Exécution :
-     * - Réarrangement bit-reversé
-     * - Boucles FFT avec calcul des twiddle factors
-     * - In-place, sans allocation supplémentaire
+     * ## fft
+     * Transformée de Fourier rapide directe.
+     * Modifie les tableaux in-place.
      */
     fun fft(real: DoubleArray, imag: DoubleArray) {
         val n = real.size
-        if (n != imag.size) throw IllegalArgumentException("Mismatched lengths")
-        if (n and (n - 1) != 0) throw IllegalArgumentException("Array length must be power of 2")
+        require(n == imag.size) { "Mismatched lengths" }
+        require(n and (n - 1) == 0) { "Array length must be power of 2" }
 
         val bits = log2(n.toDouble()).toInt()
+        // Bit reversal
         for (i in 0 until n) {
             val j = reverseBits(i, bits)
             if (j > i) {
@@ -58,14 +39,17 @@ object FFT {
         var size = 2
         while (size <= n) {
             val halfSize = size / 2
-            val tableStep = Math.PI * 2 / size
+            val tableStep = (2.0 * Math.PI) / size
             for (i in 0 until n step size) {
                 for (j in 0 until halfSize) {
-                    val k = j + i
+                    val k = i + j
                     val l = k + halfSize
                     val angle = tableStep * j
-                    val tReal = real[l] * cos(angle) + imag[l] * sin(angle)
-                    val tImag = -real[l] * sin(angle) + imag[l] * cos(angle)
+
+                    // ⚠ Signe négatif sur sin(angle) = FFT directe
+                    val tReal = real[l] * cos(angle) - imag[l] * sin(angle)
+                    val tImag = real[l] * sin(angle) + imag[l] * cos(angle)
+
                     real[l] = real[k] - tReal
                     imag[l] = imag[k] - tImag
                     real[k] += tReal
@@ -77,14 +61,34 @@ object FFT {
     }
 
     /**
-     * ##  reverseBits
-     *
-     * Inverse les bits d’un index (ex. : 3 -> 110 → 011 -> 6)
-     * Utilisé pour réorganiser les entrées en ordre bit-reversé avant la FFT.
-     *
-     * @param index Index à inverser
-     * @param bits Nombre total de bits (log2 de la taille des tableaux)
-     * @return Index inversé
+     * ## ifft
+     * Transformée de Fourier rapide inverse.
+     * Modifie les tableaux in-place.
+     * Normalise le résultat.
+     */
+    fun ifft(real: DoubleArray, imag: DoubleArray) {
+        val n = real.size
+        require(n == imag.size) { "Mismatched lengths" }
+        require(n and (n - 1) == 0) { "Array length must be power of 2" }
+
+        // Conjugué complexe
+        for (i in 0 until n) {
+            imag[i] = -imag[i]
+        }
+
+        // Applique FFT directe sur conjugué
+        fft(real, imag)
+
+        // Conjugué de nouveau + normalisation
+        for (i in 0 until n) {
+            real[i] = real[i] / n
+            imag[i] = -imag[i] / n
+        }
+    }
+
+    /**
+     * ## reverseBits
+     * Inverse les bits d’un index.
      */
     private fun reverseBits(index: Int, bits: Int): Int {
         var i = index
