@@ -5,10 +5,23 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * Parser simple binaire pour décoder un flux de bits en messages ASCII.
+ * ## SimpleBinaryParser
  *
- * Detecte start (bit 2) et stop (bit 3) pour encadrer un message,
- * puis convertit les bits en texte ASCII 8 bits par caractère.
+ * Parseur binaire minimaliste pour reconstruire des messages ASCII à partir d’un flux de bits.
+ *
+ * Ce parser :
+ * - Détecte les bits spéciaux de **début** (`startBit`, par défaut 2) et **fin** (`stopBit`, par défaut 3),
+ * - Accumule les bits entre ces marqueurs,
+ * - Reconstitue le message ASCII (8 bits = 1 caractère),
+ * - Émet le message via un `SharedFlow`.
+ *
+ * ### Usage :
+ * Appelle [onBitReceived] à chaque bit reçu par le `FskDecoder`.
+ *
+ * ---
+ *
+ * @param startBit Valeur spéciale indiquant le début d’un message (par défaut `2`)
+ * @param stopBit Valeur spéciale indiquant la fin d’un message (par défaut `3`)
  */
 class SimpleBinaryParser(
     private val startBit: Int = 2,
@@ -16,40 +29,58 @@ class SimpleBinaryParser(
 ) {
 
     private val _messageFlow = MutableSharedFlow<String>()
+
+    /**
+     * Flux exposé pour observer les messages décodés.
+     */
     val messageFlow: SharedFlow<String> = _messageFlow.asSharedFlow()
 
     private val bitBuffer = mutableListOf<Int>()
     private var isRecording = false
 
     /**
-     * Call this to process each incoming bit from the decoder.
+     * Appelé à chaque réception d’un bit (via le `FskDecoder`).
+     *
+     * Gère automatiquement :
+     * - Le déclenchement de la capture via le bit de start,
+     * - L’arrêt via le bit de stop,
+     * - La conversion des bits capturés en texte ASCII,
+     * - L’émission dans [messageFlow].
+     *
+     * @param bit Le bit reçu : 0, 1, ou marqueur (2=start, 3=stop)
      */
     suspend fun onBitReceived(bit: Int) {
         when {
             bit == startBit && !isRecording -> {
-                // Start new message
+                // Démarrage d’un nouveau message
                 bitBuffer.clear()
                 isRecording = true
             }
             bit == stopBit && isRecording -> {
-                // Stop message, parse buffer
+                // Fin de message, décodage ASCII
                 val msg = bitsToAscii(bitBuffer)
                 _messageFlow.emit(msg)
                 isRecording = false
                 bitBuffer.clear()
             }
             isRecording -> {
-                // Collect bits only if recording
+                // Accumulation des bits utiles (0 ou 1)
                 bitBuffer.add(bit)
             }
             else -> {
-                // Ignore bits outside message
+                // Bit ignoré (hors message)
             }
         }
     }
 
     /**
-     * Convertit une liste de bits (8 bits par caractère) en chaîne ASCII.
+     * Convertit une liste de bits (par paquets de 8) en chaîne de caractères ASCII.
+     *
+     * ### Exemple :
+     * `listOf(0,1,0,0,1,0,0,0)` → `"H"` (char = 72)
+     *
+     * @param bits Liste de bits (multiples de 8 recommandés)
+     * @return Chaîne ASCII correspondante
      */
     private fun bitsToAscii(bits: List<Int>): String {
         val sb = StringBuilder()
