@@ -9,6 +9,16 @@
 
 ---
 
+
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue?logo=kotlin)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-orange?logo=android)
+![MVVM](https://img.shields.io/badge/Architecture-MVVM-green)
+![Audio](https://img.shields.io/badge/AudioTrack%2FAudioRecord-PCM%2044.1kHz-yellow)
+![Custom FFT](https://img.shields.io/badge/FFT-Custom-lightgrey)
+
+
+
+
 ## Overview
 
 This Android POC demonstrates binary data transmission via ultrasound between two phones using basic binary FSK modulation, without any prior synchronization or pairing. The project handles environmental acoustic echoes.
@@ -110,16 +120,6 @@ Frame structure example:
 
 ---
 
-
-
-
-
-
-![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue?logo=kotlin)
-![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-orange?logo=android)
-![MVVM](https://img.shields.io/badge/Architecture-MVVM-green)
-![Audio](https://img.shields.io/badge/AudioTrack%2FAudioRecord-PCM%2044.1kHz-yellow)
-![Custom FFT](https://img.shields.io/badge/FFT-Custom-lightgrey)
 
 
 
