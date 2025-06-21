@@ -10,8 +10,10 @@
 ---
 
 
-![Kotlin](https://img.shields.io/badge/Kotlin-1.9-blue?logo=kotlin)
-![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-orange?logo=android)
+ ![Status](https://img.shields.io/badge/status-WIP-red)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=android&logoColor=white)
+![Android Studio](https://img.shields.io/badge/Android%20Studio-3DDC84?logo=androidstudio&logoColor=white)
 ![MVVM](https://img.shields.io/badge/Architecture-MVVM-green)
 ![Audio](https://img.shields.io/badge/AudioTrack%2FAudioRecord-PCM%2044.1kHz-yellow)
 ![Custom FFT](https://img.shields.io/badge/FFT-Custom-lightgrey)
