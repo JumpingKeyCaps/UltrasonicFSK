@@ -1,5 +1,6 @@
 package com.lebaillyapp.ultrasonicfsk.viewmodel
 
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lebaillyapp.ultrasonicfsk.data.repository.ToneRepository
@@ -20,6 +21,15 @@ class ToneTestViewModel(
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
+
+    val waveform = MutableStateFlow<List<Float>>(emptyList())
+    val fftData = MutableStateFlow<List<Float>>(emptyList())
+    val fskToneHistory = MutableStateFlow<List<Double>>(emptyList())
+    val spectrogramHistory = mutableStateListOf<List<Float>>()
+
+
+
+
     fun updateFreq0(newFreq: Double) {
         repo.setFreq0(newFreq)
         _freq0.value = repo.freq0
@@ -28,9 +38,9 @@ class ToneTestViewModel(
     fun playTone() {
         if (_isPlaying.value) return
         _isPlaying.value = true
-        player.playTone(repo.freq0, 3000, viewModelScope)
+        player.playTone(repo.freq0, 5000, viewModelScope)
         viewModelScope.launch {
-            delay(3000)
+            delay(5000)
             _isPlaying.value = false
         }
     }
