@@ -20,5 +20,5 @@ class ReceiverViewModel(
         repository.stopDecoding()
     }
 
-    val bitFlow = repository.bitFlow
+    // val bitFlow = repository.bitFlow // à décommenter si besoin
 }
