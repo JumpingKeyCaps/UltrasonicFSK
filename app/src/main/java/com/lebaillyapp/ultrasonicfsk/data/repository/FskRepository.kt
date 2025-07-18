@@ -1,38 +1,81 @@
 package com.lebaillyapp.ultrasonicfsk.data.repository
 
 import android.content.Context
-import com.lebaillyapp.ultrasonicfsk.data.service.FskDecoder
-import com.lebaillyapp.ultrasonicfsk.data.service.FskEncoder
-import kotlinx.coroutines.flow.SharedFlow
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk2.FskDecoder
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk2.FskEncoder
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk2.SimpleBinaryParser
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk4.FourFskParser
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk4.Fsk4Decoder
+import com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk4.Fsk4Encoder
 
 /**
- * Repository qui encapsule la logique d'encodage/decodage FSK.
- * Peut être utilisé par un ViewModel ou une autre couche de l'app.
+ * Repository encapsulant la logique d'encodage et décodage FSK.
+ *
+ * Permet d'utiliser soit un encodeur 2-FSK soit un encodeur 4-FSK
+ * pour la transmission, ainsi qu'un décodeur 2-FSK ou 4-FSK pour la réception.
+ *
+ * ---
+ * @param use4Fsk Flag indiquant si on utilise 4-FSK (true) ou 2-FSK (false)
  */
 class FskRepository(
-    private val encoder: FskEncoder = FskEncoder(),
-    private var decoder: FskDecoder? = null
+    private var use4Fsk: Boolean = false,
 ) {
 
+    private val encoder2Fsk = FskEncoder()
+    private val encoder4Fsk = Fsk4Encoder()
+
+    private var decoder2Fsk: FskDecoder? = null
+    private var decoder4Fsk: Fsk4Decoder? = null
+
     /**
-     * Initialise le décodeur avec un contexte si non déjà initialisé.
+     * Initialise le décodeur avec un contexte Android, et le bon parser.
      */
     fun initDecoder(context: Context) {
-        if (decoder == null) decoder = FskDecoder(context)
+        if (use4Fsk) {
+            if (decoder4Fsk == null) {
+                val parser = FourFskParser(startSymbol = 4, stopSymbol = 5)
+                decoder4Fsk = Fsk4Decoder(context, parser)
+            }
+        } else {
+            if (decoder2Fsk == null) {
+                val parser = SimpleBinaryParser(startBit = 2, stopBit = 3)
+                decoder2Fsk = FskDecoder(context, parser)
+            }
+        }
     }
 
-    fun encodeMessage(message: String): List<Pair<Double, Long>> {
-        return encoder.encode(message)
+    /**
+     * Active ou désactive l’utilisation du mode 4-FSK.
+     */
+    fun setUse4Fsk(enabled: Boolean) {
+        if (use4Fsk != enabled) {
+            stopDecoding() // stop l’ancien décodeur
+            use4Fsk = enabled
+        }
     }
 
-    val bitFlow: SharedFlow<Int>?
-        get() = decoder?.bitFlow
+    /**
+     * Encode un message selon l’encodeur actif.
+     */
+    fun encodeMessage(message: String): List<Pair<Double, Long>> =
+        if (use4Fsk) encoder4Fsk.encode(message) else encoder2Fsk.encode(message)
 
+    /**
+     * Démarre l’écoute micro et le décodage selon le mode.
+     */
     fun startDecoding() {
-        decoder?.startDecoding()
+        if (use4Fsk) {
+            decoder4Fsk?.startDecoding()
+        } else {
+            decoder2Fsk?.startDecoding()
+        }
     }
 
+    /**
+     * Stoppe proprement l’écoute micro et le décodage.
+     */
     fun stopDecoding() {
-        decoder?.stopDecoding()
+        decoder4Fsk?.stopDecoding()
+        decoder2Fsk?.stopDecoding()
     }
 }
