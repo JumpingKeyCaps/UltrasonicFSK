@@ -12,6 +12,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.lebaillyapp.ultrasonicfsk.composition.FrequencySpectrumView
+import com.lebaillyapp.ultrasonicfsk.composition.SpectrogramView
+import com.lebaillyapp.ultrasonicfsk.composition.ToneTrackerView
+import com.lebaillyapp.ultrasonicfsk.composition.WaveformView
 import com.lebaillyapp.ultrasonicfsk.viewmodel.ToneTestViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.sin
@@ -23,6 +27,9 @@ fun ToneTestScreen(
 ) {
     val freq0 by viewModel.freq0.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val waveform by viewModel.waveform.collectAsState()
+    val fftData by viewModel.fftData.collectAsState()
+    val fskHistory by viewModel.fskToneHistory.collectAsState()
 
     Column(
         modifier = Modifier
@@ -35,7 +42,7 @@ fun ToneTestScreen(
             value = freq0.toFloat(),
             onValueChange = { viewModel.updateFreq0(it.toDouble()) },
             valueRange = 20f..20000f,
-            steps = 50
+            steps = 100
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
@@ -43,12 +50,28 @@ fun ToneTestScreen(
             enabled = !isPlaying,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Jouer la fréquence 3s")
+            Text("Jouer la fréquence 5s")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         FrequencyVisualizer(freq = freq0, isPlaying = isPlaying)
+
+      //  Text("Waveform samples count: ${waveform.size}")
+      //  WaveformView(samples = waveform)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+      //  Text("FFT data count: ${fftData.size}")
+      //  FrequencySpectrumView(fft = fftData)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SpectrogramView(history = viewModel.spectrogramHistory)
+
+      //  Spacer(modifier = Modifier.height(16.dp))
+
+      //  ToneTrackerView(frequencies = fskHistory)
     }
 }
 
