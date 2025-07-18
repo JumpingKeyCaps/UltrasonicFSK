@@ -1,4 +1,4 @@
-package com.lebaillyapp.ultrasonicfsk.data.service.fsk
+package com.lebaillyapp.ultrasonicfsk.data.service.fsk.fsk2
 
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
